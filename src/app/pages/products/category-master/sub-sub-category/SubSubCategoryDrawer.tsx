@@ -1,0 +1,244 @@
+import {
+  Dialog,
+  DialogPanel,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
+import { XMarkIcon } from "@heroicons/react/24/solid";
+import { Controller, useForm } from "react-hook-form";
+import { Fragment, useEffect, useMemo, useState } from "react";
+
+import { Listbox } from "@/components/shared/form/StyledListbox";
+import { Button, Input, Switch } from "@/components/ui";
+import {
+  CategoryOption,
+  SubCategoryOption,
+  SubSubCategory,
+  SubSubCategoryFormValues,
+} from "./data";
+
+interface SubSubCategoryDrawerProps {
+  isOpen: boolean;
+  close: () => void;
+  subSubCategory: SubSubCategory | null;
+  categoryOptions: CategoryOption[];
+  subCategoryOptions: SubCategoryOption[];
+  onSave: (values: SubSubCategoryFormValues, subSubCategoryId?: string) => Promise<void> | void;
+}
+
+function FileInput({
+  existingName,
+  error,
+  onChange,
+}: {
+  existingName?: string;
+  error?: string;
+  onChange: (files: FileList | undefined) => void;
+}) {
+  const [selectedName, setSelectedName] = useState("");
+
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-dark-100">
+        Icon (JPG/JPEG/PNG, max 200x200)
+      </label>
+      <input
+        type="file"
+        accept="image/jpeg,image/jpg,image/png"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          setSelectedName(file?.name || "");
+          onChange(e.target.files || undefined);
+        }}
+        className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-primary-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-450 dark:bg-dark-700 dark:text-white dark:file:bg-primary/15 dark:file:text-primary-300"
+      />
+      {(selectedName || existingName) ? (
+        <p className="mt-2 break-all text-xs text-gray-500 dark:text-dark-300">
+          {selectedName || existingName}
+        </p>
+      ) : null}
+      {error ? <p className="mt-1 text-sm text-error">{error}</p> : null}
+    </div>
+  );
+}
+
+export function SubSubCategoryDrawer({
+  isOpen,
+  close,
+  subSubCategory,
+  categoryOptions,
+  subCategoryOptions,
+  onSave,
+}: SubSubCategoryDrawerProps) {
+  const isEdit = Boolean(subSubCategory?.id);
+  const [saving, setSaving] = useState(false);
+
+  const defaultValues = useMemo<SubSubCategoryFormValues>(
+    () => ({
+      categoryId: subSubCategory?.categoryId || "",
+      subCategoryId: subSubCategory?.subCategoryId || "",
+      name: subSubCategory?.name || "",
+      status: subSubCategory?.isActive ?? true,
+      icon: undefined,
+    }),
+    [subSubCategory],
+  );
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<SubSubCategoryFormValues>({
+    defaultValues,
+  });
+
+  useEffect(() => {
+    if (isOpen) reset(defaultValues);
+  }, [defaultValues, isOpen, reset]);
+
+  const selectedCategoryId = watch("categoryId");
+
+  const filteredSubCategoryOptions = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    return subCategoryOptions.filter((item) => item.categoryId === selectedCategoryId);
+  }, [selectedCategoryId, subCategoryOptions]);
+
+  useEffect(() => {
+    const currentSubCategoryId = watch("subCategoryId");
+    if (
+      currentSubCategoryId &&
+      !filteredSubCategoryOptions.some((item) => item.id === currentSubCategoryId)
+    ) {
+      setValue("subCategoryId", "");
+    }
+  }, [filteredSubCategoryOptions, setValue, watch]);
+
+  const handleClose = () => {
+    reset(defaultValues);
+    close();
+  };
+
+  const onSubmit = async (values: SubSubCategoryFormValues) => {
+    setSaving(true);
+    try {
+      await onSave(values, subSubCategory?.id);
+      handleClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-100" onClose={handleClose}>
+        <TransitionChild as="div" enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0" className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity dark:bg-black/40" />
+
+        <TransitionChild
+          as={DialogPanel}
+          enter="ease-out transform-gpu transition-transform duration-200"
+          enterFrom="translate-x-full"
+          enterTo="translate-x-0"
+          leave="ease-in transform-gpu transition-transform duration-200"
+          leaveFrom="translate-x-0"
+          leaveTo="translate-x-full"
+          className="dark:bg-dark-700 fixed top-0 right-0 flex h-full w-full lg:max-w-[50%] transform-gpu flex-col bg-white transition-transform duration-200"
+        >
+          <div className="bg-primary flex items-center justify-between border-b border-gray-200 px-4 py-4 dark:border-dark-500 sm:px-5">
+            <h3 className="text-lg font-semibold text-white">
+              {isEdit ? "Edit Sub Sub Category" : "Add Sub Sub Category"}
+            </h3>
+            <Button onClick={handleClose} variant="flat" isIcon className="size-6 rounded-full text-white">
+              <XMarkIcon className="size-4.5" />
+            </Button>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="flex grow flex-col overflow-hidden">
+            <div className="hide-scrollbar grow space-y-6 overflow-y-auto px-4 py-4 sm:px-5">
+              <Controller
+                control={control}
+                name="categoryId"
+                rules={{ required: "Category is required" }}
+                render={({ field: { value, onChange, ...rest } }) => (
+                  <Listbox
+                    data={categoryOptions}
+                    value={categoryOptions.find((item) => item.id === value) || null}
+                    onChange={(item) => {
+                      onChange(item.id);
+                      setValue("subCategoryId", "");
+                    }}
+                    label="Category"
+                    placeholder="Select"
+                    displayField="label"
+                    error={errors.categoryId?.message}
+                    {...rest}
+                  />
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="subCategoryId"
+                rules={{ required: "Sub Category is required" }}
+                render={({ field: { value, onChange, ...rest } }) => (
+                  <Listbox
+                    data={filteredSubCategoryOptions}
+                    value={filteredSubCategoryOptions.find((item) => item.id === value) || null}
+                    onChange={(item) => onChange(item.id)}
+                    label="Sub Category"
+                    placeholder="Select"
+                    displayField="label"
+                    error={errors.subCategoryId?.message}
+                    {...rest}
+                  />
+                )}
+              />
+
+              <Input
+                label="Name"
+                placeholder="Enter Name"
+                {...register("name", { required: "Name is required" })}
+                error={errors.name?.message}
+              />
+
+              <FileInput
+                existingName={subSubCategory?.icon}
+                error={typeof errors.icon?.message === "string" ? errors.icon.message : undefined}
+                onChange={(files) => setValue("icon", files)}
+              />
+
+              <Controller
+                control={control}
+                name="status"
+                render={({ field: { value, onChange, ...rest } }) => (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700 dark:text-dark-100">Status</span>
+                    <Switch
+                      checked={value}
+                      onChange={(e) => onChange(e.target.checked)}
+                      color="primary"
+                      {...rest}
+                    />
+                    <span className="text-sm text-gray-700 dark:text-dark-100">
+                      {value ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                )}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-4 py-4 dark:border-dark-500 sm:px-5">
+              <Button type="button" onClick={handleClose} disabled={saving}>Cancel</Button>
+              <Button type="submit" color="primary" disabled={saving} className="min-w-[7rem]">
+                {saving ? "Saving..." : isEdit ? "Update" : "Add"}
+              </Button>
+            </div>
+          </form>
+        </TransitionChild>
+      </Dialog>
+    </Transition>
+  );
+}
