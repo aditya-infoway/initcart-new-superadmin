@@ -104,16 +104,17 @@ export const mapApiDealOfTheDayRows = (item: any): DealOfTheDayRow[] => {
   });
 };
 
-export const placementOptions = [
-  { id: "", label: "All Placements" },
+const placementOptions = [
+  { id: "all", label: "All Placements" },
   { id: "main_section", label: "Main Section" },
   { id: "product_list", label: "Product List" },
   { id: "hero_banner", label: "Hero Banner" },
   { id: "unassigned", label: "Unassigned" },
 ];
 
-export const statusOptions = [
-  { id: "", label: "All Status" },
-  { id: "approved", label: "Approved" },
-  { id: "pending", label: "Pending" },
-];
+  const statusOptions = [
+    { id: "all", label: "All Status" },
+    { id: "approved", label: "Approved" },
+    { id: "pending", label: "Pending" },
+    { id: "rejected", label: "Rejected" },
+  ];

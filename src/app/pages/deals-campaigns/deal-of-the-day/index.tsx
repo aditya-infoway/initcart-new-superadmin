@@ -19,72 +19,251 @@ import { useEffect, useMemo, useState } from "react";
 import { Get, toasterrormsg } from "@/ApiHelper";
 import { Page } from "@/components/shared/Page";
 import { Listbox } from "@/components/shared/form/StyledListbox";
-import { Button, Input } from "@/components/ui";
+import { Input } from "@/components/ui";
 import { fuzzyFilter } from "@/utils/react-table/fuzzyFilter";
 import { MasterTable } from "../../master/shared/MasterTable";
 import { columns } from "./columns";
-import {
-  DealOfTheDayRow,
-  mapApiDealOfTheDayRows,
-  placementOptions,
-  statusOptions,
-} from "./data";
+
+//  Local types - matching API response
+interface VendorDetails {
+  id: number;
+  business_name: string;
+  email: string;
+  phone: string;
+}
+
+interface CampaignDetails {
+  id: number;
+  campaign_name: string;
+  campaign_type: string;
+  start_datetime: string;
+  end_datetime: string;
+  minimum_discount: number;
+}
+
+interface ProductDetails {
+  id: number;
+  product_name: string;
+  main_image?: string;
+  category?: { name: string };
+  stocks?: Array<{ variant_image?: string }>;
+}
+
+interface DealProduct {
+  id: number;
+  product_details: ProductDetails;
+  vendor_details?: VendorDetails;
+  campaign_details?: CampaignDetails;
+  original_price: number;
+  final_price: number;
+  special_price: number | null;
+  discount_percentage: number | null;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  deal_of_day_placement?: string;
+  has_banner_details?: boolean;
+  banner_image_url?: string;
+  banner_title?: string;
+  banner_subtitle?: string;
+  banner_button_url?: string;
+  meets_minimum_discount?: boolean;
+}
+
+//  Define Row type for table
+interface DealOfTheDayRow {
+  id: string;
+  productId: string;
+  productName: string;
+  vendorName: string;
+  vendorEmail: string;
+  vendorPhone: string;
+  campaignId: string;
+  campaignName: string;
+  startTime: string;
+  endTime: string;
+  pricing: string;
+  placement: string;
+  discountCheck: string;
+  status: string;
+  isBannerProduct: boolean;
+}
 
 export default function DealOfTheDayPage() {
+  //  Placement options matching data
+  const placementOptions = [
+    { id: "all", label: "All Placements" },
+    { id: "main", label: "Main Section" },
+    { id: "product_list", label: "Product List" },
+    { id: "banner", label: "Hero Banner" },
+    { id: "unassigned", label: "Unassigned" },
+  ];
+
+  const statusOptions = [
+    { id: "all", label: "All Status" },
+    { id: "Approved", label: "Approved" },
+    { id: "Pending", label: "Pending" },
+    { id: "Rejected", label: "Rejected" },
+  ];
+
+  const [allProducts, setAllProducts] = useState<DealProduct[]>([]);
   const [data, setData] = useState<DealOfTheDayRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [placementFilter, setPlacementFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [placementFilter, setPlacementFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("");
 
+  //  Fetch data - matching your working page logic
   const fetchAll = async () => {
     setLoading(true);
     try {
+      // First get all Deal of the Day campaigns
       const response = await Get("ecommerce/admin/campaigns/?campaign_type=Deal+of+the+Day", {}, false);
-      const rows = Array.isArray(response.data)
+      
+      const campaigns = Array.isArray(response.data)
         ? response.data
         : Array.isArray(response.data?.results)
           ? response.data.results
           : Array.isArray(response.data?.data)
             ? response.data.data
             : [];
-      setData(rows.flatMap(mapApiDealOfTheDayRows));
-    } catch {
+
+      let allDealProducts: DealProduct[] = [];
+
+      // For each campaign, fetch products
+      for (const campaign of campaigns) {
+        try {
+          // Get participations
+          const participationsRes = await Get(`ecommerce/admin/campaign-participations/?campaign_id=${campaign.id}`, {}, false);
+          const participations = participationsRes.data || [];
+
+          for (const participation of participations) {
+            try {
+              const productsRes = await Get(`ecommerce/admin/participation-products/${participation.id}/`, {}, false);
+              const products = productsRes.data || [];
+
+              const productsWithDetails = products.map((product: any) => ({
+                ...product,
+                original_price: parseFloat(product.original_price || 0),
+                final_price: parseFloat(product.final_price || 0),
+                campaign_details: {
+                  id: campaign.id,
+                  campaign_name: campaign.campaign_name,
+                  campaign_type: campaign.campaign_type,
+                  start_datetime: campaign.start_datetime,
+                  end_datetime: campaign.end_datetime,
+                  minimum_discount: campaign.minimum_discount
+                },
+                vendor_details: participation.vendor_details,
+                product_details: product.product_details || {
+                  id: 0,
+                  product_name: 'Unknown Product',
+                  category: { name: 'No Category' }
+                },
+                has_banner_details: product.has_banner_details || !!(product.banner_image_url || product.banner_title),
+                meets_minimum_discount: checkMinimumDiscount(product, campaign)
+              }));
+
+              allDealProducts = [...allDealProducts, ...productsWithDetails];
+            } catch (error) {
+              console.error(`Error fetching products for participation ${participation.id}:`, error);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching participations for campaign ${campaign.id}:`, error);
+        }
+      }
+
+      setAllProducts(allDealProducts);
+
+      //  Convert to table rows
+      const rows = allDealProducts.map((item) => ({
+        id: String(item.id),
+        productId: String(item.product_details?.id || item.id),
+        productName: item.product_details?.product_name || 'Unknown Product',
+        vendorName: item.vendor_details?.business_name || '—',
+        vendorEmail: item.vendor_details?.email || '',
+        vendorPhone: item.vendor_details?.phone || '',
+        campaignId: String(item.campaign_details?.id || ''),
+        campaignName: item.campaign_details?.campaign_name || '',
+        startTime: item.campaign_details?.start_datetime || '',
+        endTime: item.campaign_details?.end_datetime || '',
+        pricing: `₹${item.final_price?.toFixed(2) || '0'}`,
+        placement: item.deal_of_day_placement || 'unassigned',
+        discountCheck: item.meets_minimum_discount ? ' Meets' : '❌ Below',
+        status: item.status || 'Pending',
+        isBannerProduct: item.deal_of_day_placement === 'banner',
+      }));
+
+      setData(rows);
+
+    } catch (error) {
+      console.error('Error fetching Deal of the Day products:', error);
       toasterrormsg("Something went wrong while fetching deal of the day campaigns.");
     } finally {
       setLoading(false);
     }
   };
 
+  //  Helper function
+  const checkMinimumDiscount = (product: any, campaign: any): boolean => {
+    if (product.discount_percentage) {
+      return product.discount_percentage >= campaign.minimum_discount;
+    } else if (product.special_price) {
+      const originalPrice = parseFloat(product.original_price || 0);
+      const specialPrice = parseFloat(product.special_price);
+      const discountPercentage = ((originalPrice - specialPrice) / originalPrice) * 100;
+      return discountPercentage >= campaign.minimum_discount;
+    }
+    return false;
+  };
+
   useEffect(() => {
     fetchAll();
   }, []);
 
+  //  Campaign options from data
   const campaignOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
     data.forEach((item) => {
       if (!map.has(item.campaignId)) {
-        map.set(item.campaignId, { id: item.campaignId, label: item.campaignName || `Campaign #${item.campaignId}` });
+        map.set(item.campaignId, { 
+          id: item.campaignId, 
+          label: item.campaignName || `Campaign #${item.campaignId}` 
+        });
       }
     });
     return [{ id: "", label: "All Campaigns" }, ...Array.from(map.values())];
   }, [data]);
 
+  //  Filtered data
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      if (placementFilter && item.placement !== placementFilter) return false;
-      if (statusFilter && item.status !== statusFilter) return false;
-      if (campaignFilter && item.campaignId !== campaignFilter) return false;
+      // Placement filter
+      if (placementFilter === "unassigned") {
+        if (item.placement && item.placement !== "unassigned") return false;
+      } else if (placementFilter && placementFilter !== "all") {
+        if (item.placement !== placementFilter) return false;
+      }
+
+      // Status filter
+      if (statusFilter && statusFilter !== "all") {
+        if (item.status !== statusFilter) return false;
+      }
+
+      // Campaign filter
+      if (campaignFilter && campaignFilter !== "all") {
+        if (item.campaignId !== campaignFilter) return false;
+      }
+
       return true;
     });
   }, [data, placementFilter, statusFilter, campaignFilter]);
 
   const table = useReactTable({
     data: filteredData,
-    columns,
+    columns: columns as any, 
     state: { sorting, rowSelection, globalFilter },
     enableRowSelection: true,
     getRowId: (row) => row.id,
@@ -99,12 +278,13 @@ export default function DealOfTheDayPage() {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
+  //  Stats
   const stats = useMemo(() => ({
     filtered: filteredData.length,
-    approved: filteredData.filter((item) => item.status === "approved").length,
-    pending: filteredData.filter((item) => item.status === "pending").length,
-    banner: filteredData.filter((item) => item.isBannerProduct).length,
-    unassigned: filteredData.filter((item) => item.placement === "unassigned").length,
+    approved: filteredData.filter((item) => item.status === "Approved").length,
+    pending: filteredData.filter((item) => item.status === "Pending").length,
+    banner: filteredData.filter((item) => item.placement === "banner").length,
+    unassigned: filteredData.filter((item) => item.placement === "unassigned" || !item.placement).length,
   }), [filteredData]);
 
   return (
@@ -120,7 +300,6 @@ export default function DealOfTheDayPage() {
                 Total Products: {filteredData.length} / {data.length}
               </p>
             </div>
-
           </div>
 
           <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4 dark:border-dark-500 dark:bg-dark-700">
@@ -192,8 +371,6 @@ export default function DealOfTheDayPage() {
               </div>
             </div>
           </div>
-
-
         </div>
 
         <MasterTable
