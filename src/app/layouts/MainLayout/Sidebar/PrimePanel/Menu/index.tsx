@@ -18,6 +18,7 @@ export interface MenuProps {
   pathname: string;
 }
 
+
 export function Menu({ nav, pathname }: MenuProps) {
   const initialActivePath = useMemo(() => {
     return nav.find((item) => isRouteActive(item.path, pathname))?.path ?? "";

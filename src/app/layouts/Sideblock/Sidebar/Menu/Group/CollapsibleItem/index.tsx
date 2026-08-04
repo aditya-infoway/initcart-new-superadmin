@@ -18,6 +18,7 @@ import { navigationIcons } from "@/app/navigation/icons";
 // ----------------------------------------------------------------------
 
 export function CollapsibleItem({ data, showIcon = true }: { data: NavigationTree; showIcon?: boolean }) {
+  console.log("Collapsible:", data.id, data.type);
   const { id, path, transKey, icon, childs, title } = data;
   const { t } = useTranslation();
   const { isRtl } = useLocaleContext();
@@ -72,11 +73,33 @@ export function CollapsibleItem({ data, showIcon = true }: { data: NavigationTre
               )}
             />
           </AccordionButton>
-          <AccordionPanel className="flex flex-col space-y-1 px-3 py-1.5">
-            {childs.map((child) => (
-              <MenuItem key={child.id} data={child} showIcon={showIcon} />
-            ))}
-          </AccordionPanel>
+<AccordionPanel className="flex flex-col space-y-1 px-3 py-1.5">
+{childs.map((child) => {
+  console.log("Child:", child.id, child.type);
+
+  if (child.type === "collapse") {
+    console.log("Rendering Collapse:", child.id);
+
+    return (
+      <CollapsibleItem
+        key={child.id}
+        data={child}
+        showIcon={showIcon}
+      />
+    );
+  }
+
+  console.log("Rendering Menu:", child.id);
+
+  return (
+    <MenuItem
+      key={child.id}
+      data={child}
+      showIcon={showIcon}
+    />
+  );
+})}
+</AccordionPanel>
         </>
       )}
     </AccordionItem>

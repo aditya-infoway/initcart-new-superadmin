@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 // Local Imports
 import {
+  Accordion,
   AccordionButton,
   AccordionItem,
   AccordionPanel,
@@ -25,7 +26,9 @@ export function CollapsibleItem({ data }: { data: NavigationTree }) {
 
   if (!childs) {
     throw "The collapsible item must have childs";
+
   }
+
  
   return (
     <AccordionItem value={path ?? id}>
@@ -47,11 +50,23 @@ export function CollapsibleItem({ data }: { data: NavigationTree }) {
               )}
             />
           </AccordionButton>
-          <AccordionPanel>
-            {childs.map((i) => (
-              <MenuItem key={i.path} data={i} />
-            ))}
-          </AccordionPanel>
+<AccordionPanel>
+  <Accordion multiple>
+    {childs.map((i) =>
+      i.type === "collapse" ? (
+        <CollapsibleItem
+          key={i.id}
+          data={i}
+        />
+      ) : (
+        <MenuItem
+          key={i.id}
+          data={i}
+        />
+      )
+    )}
+  </Accordion>
+</AccordionPanel>
         </>
       )}
     </AccordionItem>

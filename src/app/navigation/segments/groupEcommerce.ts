@@ -62,17 +62,19 @@ export const groupEcommerce: NavigationTree = {
     },
 
     // ── Orders ────────────────────────────────────────────────────────
-    {
-      id: "orders",
-      type: "collapse",
-      path: "/orders",
-      title: "Orders",
-      icon: "orders",
-      childs: [
-        { id: "orders.allOrders",          type: "item", path: "/orders/all-orders",           title: "All Orders",           icon: "orders.allOrders" },
-        { id: "orders.orderProfitReport",  type: "item", path: "/orders/order-profit-report",  title: "Order Profit Report",  icon: "orders.orderProfitReport" },
-      ],
-    },
+// ── Orders ────────────────────────────────────────────────────────
+{
+  id: "orders",
+  type: "collapse",
+  path: "/orders",
+  title: "Orders",
+  icon: "orders",
+  childs: [
+    { id: "orders.allOrders", type: "item", path: "/orders/all-orders", title: "All Orders", icon: "orders.allOrders" },
+    { id: "orders.orderProfitReport", type: "item", path: "/orders/order-profit-report", title: "Order Profit Report", icon: "orders.orderProfitReport" },
+    { id: "orders.AllVendorsOrderReport", type: "item", path: "/orders/all-vendor-order-report", title: "All Vendor Order Report", icon: "orders.orderProfitReport" },
+  ],
+},
 
     // ── Reports ───────────────────────────────────────────────────────
     {
