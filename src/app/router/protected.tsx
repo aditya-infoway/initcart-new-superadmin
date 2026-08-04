@@ -765,39 +765,39 @@ const protectedRoutes: RouteObject = {
             },
           ],
         },
-        {
-          path: "orders",
-          children: [
-            {
-              index: true,
-              element: <Navigate to="/orders/all-orders" replace />,
-            },
-            {
-              path: "all-orders",
-              lazy: async () => ({
-                Component: (
-                  await import("@/app/pages/orders/all-orders")
-                ).default,
-              }),
-            },
-            {
-              path: "all-orders/:orderId",
-              lazy: async () => ({
-                Component: (
-                  await import("@/app/pages/orders/all-orders/detail")
-                ).default,
-              }),
-            },
-            {
-              path: "order-profit-report",
-              lazy: async () => ({
-                Component: (
-                  await import("@/app/pages/orders/order-profit-report")
-                ).default,
-              }),
-            },
-          ],
-        },
+{
+  path: "orders",
+  children: [
+    {
+      index: true,
+      element: <Navigate to="/orders/all-orders" replace />,
+    },
+    {
+      path: "all-orders",
+      lazy: async () => ({
+        Component: (await import("@/app/pages/orders/all-orders")).default,
+      }),
+    },
+    {
+      path: "all-orders/:orderId",
+      lazy: async () => ({
+        Component: (await import("@/app/pages/orders/all-orders/detail")).default,
+      }),
+    },
+    {
+      path: "order-profit-report",
+      lazy: async () => ({
+        Component: (await import("@/app/pages/orders/order-profit-report")).default,
+      }),
+    },
+    {
+      path: "all-vendor-order-report",  // ← MATCHES navigation
+      lazy: async () => ({
+        Component: (await import("@/app/pages/orders/vendor-order-report")).default,
+      }),
+    },
+  ],
+},
         {
           path: "reports",
           children: [

@@ -50,6 +50,7 @@ export function Group({ data, showIcon = true }: { data: NavigationTree; showIco
         <Collapse in={isOpened}>
           <div className="flex flex-col space-y-1.5">
             {data.childs.map((item) => {
+              console.log(item.title, item.type, item.path);
               switch (item.type) {
                 case "collapse":
                   return <CollapsibleItem key={item.path} data={item} showIcon={showIcon} />;

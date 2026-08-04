@@ -1,11 +1,11 @@
 export const APP_NAME = "InitCart SuperAdmin";
 export const APP_KEY = "tailux";
-export const APP_LOGO = "/images/initcart/fav.png";
-export const APP_FAVICON = "/images/initcart/fav.png";
+export const APP_LOGO = `${import.meta.env.BASE_URL}images/initcart/fav.png`;
+export const APP_FAVICON = `${import.meta.env.BASE_URL}images/initcart/fav.png`;
 
 // Redirect Paths
 export const REDIRECT_URL_KEY = "redirect";
-export const SUPERADMIN_BASE_PATH = "/superadmin";
+export const SUPERADMIN_BASE_PATH = "/superadmin2";
 export const HOME_PATH = "/";
 export const GHOST_ENTRY_PATH = "/login";
 export const SELECT_COMPANY_PATH = "/select-company";
