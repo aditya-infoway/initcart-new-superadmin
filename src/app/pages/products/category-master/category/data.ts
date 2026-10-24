@@ -1,9 +1,12 @@
+
+//data.tsx
 export interface Category {
   id: string;
   name: string;
   description: string;
   platformCharge: string;
   icon: string;
+  banner: string;
   status: string;
   isActive: boolean;
   showOnHomepage: boolean;
@@ -17,7 +20,8 @@ export interface CategoryFormValues {
   platformCharge: string;
   status: string;
   showOnHomepage: string;
-  icon?: FileList;
+  icon?: File | null;
+  banner?: File | null;
 }
 
 export const emptyCategory = (): Category => ({
@@ -26,6 +30,7 @@ export const emptyCategory = (): Category => ({
   description: "",
   platformCharge: "0",
   icon: "",
+  banner: "",
   status: "active",
   isActive: true,
   showOnHomepage: false,
@@ -43,12 +48,18 @@ const pickString = (...values: any[]) => {
 
 export const mapApiCategoryToCategory = (item: any): Category => ({
   id: String(item.id ?? ""),
-  name: pickString(item.name),
+  name: pickString(item.name, item.category),
   description: pickString(item.description),
   platformCharge: pickString(item.platform_charge, item.platformCharge, 0),
   icon: pickString(item.icon_url, item.icon),
-  status: item.status === true || item.status === "active" ? "active" : "inactive",
-  isActive: Boolean(item.status === true || item.status === "active"),
+  banner: pickString(item.banner_url, item.banner),
+  status:
+    item.status === true || item.status === "active" || item.status === "Active"
+      ? "active"
+      : "inactive",
+  isActive: Boolean(
+    item.status === true || item.status === "active" || item.status === "Active",
+  ),
   showOnHomepage: Boolean(item.web_home),
   featured: Boolean(item.is_featured),
   featuredOrder: Number(item.featured_order ?? 0),
@@ -62,10 +73,8 @@ export const buildCategoryFormData = (values: CategoryFormValues) => {
   formData.append("status", values.status === "active" ? "true" : "false");
   formData.append("web_home", values.showOnHomepage === "yes" ? "true" : "false");
 
-  const iconFile = values.icon?.[0];
-  if (iconFile) {
-    formData.append("icon", iconFile);
-  }
+  if (values.icon) formData.append("icon", values.icon);
+  if (values.banner) formData.append("banner_image", values.banner);
 
   return formData;
 };

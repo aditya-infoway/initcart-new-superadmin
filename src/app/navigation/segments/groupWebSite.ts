@@ -29,5 +29,12 @@ export const groupWebSite: NavigationTree = {
       title: "Mobile Banner",
       icon: "webSite.mobileBanner",
     },
+    {
+      id: "webSite.topSellerManage",
+      type: "item",
+      path: "/web-site/top-seller-management",
+      title: "Top Seller Management",
+      icon: "webSite.topSellerManagement",
+    },
   ],
 };

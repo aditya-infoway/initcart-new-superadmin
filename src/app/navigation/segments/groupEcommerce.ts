@@ -73,6 +73,19 @@ export const groupEcommerce: NavigationTree = {
     { id: "orders.allOrders", type: "item", path: "/orders/all-orders", title: "All Orders", icon: "orders.allOrders" },
     { id: "orders.orderProfitReport", type: "item", path: "/orders/order-profit-report", title: "Order Profit Report", icon: "orders.orderProfitReport" },
     { id: "orders.AllVendorsOrderReport", type: "item", path: "/orders/all-vendor-order-report", title: "All Vendor Order Report", icon: "orders.orderProfitReport" },
+    { id: "orders.ReturnRequests", type: "item", path: "/orders/return-requests", title: "Return Requests", icon: "orders.ReturnRequests" },
+    { id: "orders.Refund", type: "item", path: "/orders/refund-list", title: "Refund Management", icon: "orders.Refund" },
+  ],
+},
+{
+  id: "CODRefunds",
+  type: "collapse",
+  path: "/orders",
+  title: "COD Refund Management",
+  icon: "CODRefunds",
+  childs: [
+    { id: "CODRefunds.refundList",   type: "item", path: "/orders/cod-refunds",          title: "COD Refunds",          icon: "CODRefunds" },
+    { id: "CODRefunds.bankAccounts", type: "item", path: "/orders/refund-bank-accounts", title: "Refund Bank Accounts", icon: "CODRefunds" },
   ],
 },
 

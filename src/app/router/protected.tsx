@@ -615,6 +615,14 @@ const protectedRoutes: RouteObject = {
                 ).default,
               }),
             },
+            {
+              path: "top-seller-management",
+              lazy: async () => ({
+                Component: (
+                  await import("@/app/pages/web-site/top-seller-management")
+                ).default,
+              }),
+            },
           ],
         },
         {
@@ -796,6 +804,30 @@ const protectedRoutes: RouteObject = {
         Component: (await import("@/app/pages/orders/vendor-order-report")).default,
       }),
     },
+    {
+      path: "return-requests",
+      lazy: async () => ({
+        Component: (await import("@/app/pages/orders/return-requests")).default,
+      }),
+    },
+        {
+      path: "refund-list",
+      lazy: async () => ({
+        Component: (await import("@/app/pages/orders/refunds")).default,
+      }),
+    },
+    {
+  path: "cod-refunds",
+  lazy: async () => ({
+    Component: (await import("@/app/pages/orders/cod-refunds")).default,
+  }),
+},
+{
+  path: "refund-bank-accounts",
+  lazy: async () => ({
+    Component: (await import("@/app/pages/orders/refund-bank-accounts")).default,
+  }),
+},
   ],
 },
         {

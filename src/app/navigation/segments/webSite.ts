@@ -28,5 +28,12 @@ export const webSite: NavigationTree = {
       // transKey: "nav.webSite.mobileBanner",
       icon: "webSite.mobileBanner",
     },
+    {
+      id: "webSite.TopSellerManagement",
+      type: "item",
+      path: "/web-site/topsellermanagement",
+      title: "Top Seller Management",
+      icon: "webSite.topsellermanagement",
+    },
   ],
 };

@@ -14,10 +14,11 @@ import { Page } from "@/components/shared/Page";
 import { Listbox } from "@/components/shared/form/StyledListbox";
 import { Input } from "@/components/ui";
 import { fuzzyFilter } from "@/utils/react-table/fuzzyFilter";
+import { exportToExcel, exportToPdf } from "../../../master/shared/export";
 import { MasterTable } from "../../../master/shared/MasterTable";
 import { MasterToolbar } from "../../../master/shared/MasterToolbar";
 import { statusOptions } from "../../../master/shared/constants";
-import { columns } from "./columns.tsx";
+import { columns } from "./columns";
 import {
   buildSubCategoryFormData,
   emptySubCategory,
@@ -27,7 +28,28 @@ import {
   SubCategory,
   SubCategoryFormValues,
 } from "./data";
+import { OverlayColorCard } from "./OverlayColorCard";
 import { SubCategoryDrawer } from "./SubCategoryDrawer";
+
+// message / detail / first field error from the API
+const apiError = (error: any, fallback: string) => {
+  const d = error?.response?.data;
+  if (!d) return fallback;
+  if (typeof d === "string") return d;
+  if (d.message) return String(d.message);
+  if (d.detail) return String(d.detail);
+  const first: any = Object.values(d)[0];
+  return Array.isArray(first) ? String(first[0]) : first ? String(first) : fallback;
+};
+
+const toRows = (data: any) =>
+  Array.isArray(data)
+    ? data
+    : Array.isArray(data?.results)
+      ? data.results
+      : Array.isArray(data?.data)
+        ? data.data
+        : [];
 
 export default function ProductSubCategoryPage() {
   const [data, setData] = useState<SubCategory[]>([]);
@@ -46,14 +68,7 @@ export default function ProductSubCategoryPage() {
   const fetchCategoryOptions = async () => {
     try {
       const response = await Get("ecommerce/category/", {}, false);
-      const rows = Array.isArray(response.data)
-        ? response.data
-        : Array.isArray(response.data?.results)
-          ? response.data.results
-          : Array.isArray(response.data?.data)
-            ? response.data.data
-            : [];
-      setCategoryOptions(rows.map(mapApiCategoryOption));
+      setCategoryOptions(toRows(response.data).map(mapApiCategoryOption));
     } catch {
       toasterrormsg("Failed to fetch category options.");
     }
@@ -63,14 +78,7 @@ export default function ProductSubCategoryPage() {
     setLoading(true);
     try {
       const response = await Get("ecommerce/subcategory/", {}, false);
-      const rows = Array.isArray(response.data)
-        ? response.data
-        : Array.isArray(response.data?.results)
-          ? response.data.results
-          : Array.isArray(response.data?.data)
-            ? response.data.data
-            : [];
-      setData(rows.map(mapApiSubCategory));
+      setData(toRows(response.data).map(mapApiSubCategory));
     } catch {
       toasterrormsg("Something went wrong while fetching sub categories.");
     } finally {
@@ -92,6 +100,9 @@ export default function ProductSubCategoryPage() {
     });
   }, [data, filterName, filterStatus, filterCategory]);
 
+  // first sub category that has a banner (used in the colour preview card)
+  const previewBanner = useMemo(() => data.find((item) => item.banner)?.banner, [data]);
+
   const handleSave = async (values: SubCategoryFormValues, subCategoryId?: string) => {
     const formData = buildSubCategoryFormData(values);
     try {
@@ -104,9 +115,8 @@ export default function ProductSubCategoryPage() {
       }
       await fetchAll();
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.detail || "Something went wrong while saving the sub category.";
-      toasterrormsg(message);
-      throw error;
+      toasterrormsg(apiError(error, "Something went wrong while saving the sub category."));
+      throw error; // drawer stays open and shows field errors
     }
   };
 
@@ -116,8 +126,7 @@ export default function ProductSubCategoryPage() {
       toastsuccessmsg("Sub Category deleted successfully.");
       setData((prev) => prev.filter((item) => item.id !== subCategory.id));
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.detail || "Something went wrong while deleting the sub category.";
-      toasterrormsg(message);
+      toasterrormsg(apiError(error, "Something went wrong while deleting the sub category."));
     }
   };
 
@@ -161,6 +170,8 @@ export default function ProductSubCategoryPage() {
   return (
     <Page title="Sub Category">
       <div className="transition-content w-full pb-5">
+        <OverlayColorCard previewBanner={previewBanner} />
+
         <MasterToolbar
           title="Sub Category"
           createLabel="Add Sub Category"
@@ -172,8 +183,8 @@ export default function ProductSubCategoryPage() {
             setEditing(emptySubCategory());
             setDrawerOpen(true);
           }}
-          onExportExcel={() => {}}
-          onExportPdf={() => {}}
+          onExportExcel={() => exportToExcel(filteredData, [], "sub-categories")}
+          onExportPdf={() => exportToPdf(filteredData, [], "Sub Category List", "sub-categories")}
           filterPanel={
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
