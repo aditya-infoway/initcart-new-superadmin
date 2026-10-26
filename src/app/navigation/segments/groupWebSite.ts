@@ -36,5 +36,12 @@ export const groupWebSite: NavigationTree = {
       title: "Top Seller Management",
       icon: "webSite.topSellerManagement",
     },
+    {
+      id: "webSite.qrCodes",
+      type: "item", 
+      path: "/web-site/qr-codes", 
+      title: "QR Codes", 
+      icon: "webSite.qrCodes" 
+    },
   ],
 };

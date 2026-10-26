@@ -623,6 +623,12 @@ const protectedRoutes: RouteObject = {
                 ).default,
               }),
             },
+            {
+  path: "qr-codes",
+  lazy: async () => ({
+    Component: (await import("@/app/pages/web-site/qr-codes")).default,
+  }),
+},
           ],
         },
         {
@@ -773,63 +779,72 @@ const protectedRoutes: RouteObject = {
             },
           ],
         },
-{
-  path: "orders",
-  children: [
-    {
-      index: true,
-      element: <Navigate to="/orders/all-orders" replace />,
-    },
-    {
-      path: "all-orders",
-      lazy: async () => ({
-        Component: (await import("@/app/pages/orders/all-orders")).default,
-      }),
-    },
-    {
-      path: "all-orders/:orderId",
-      lazy: async () => ({
-        Component: (await import("@/app/pages/orders/all-orders/detail")).default,
-      }),
-    },
-    {
-      path: "order-profit-report",
-      lazy: async () => ({
-        Component: (await import("@/app/pages/orders/order-profit-report")).default,
-      }),
-    },
-    {
-      path: "all-vendor-order-report",  // ← MATCHES navigation
-      lazy: async () => ({
-        Component: (await import("@/app/pages/orders/vendor-order-report")).default,
-      }),
-    },
-    {
-      path: "return-requests",
-      lazy: async () => ({
-        Component: (await import("@/app/pages/orders/return-requests")).default,
-      }),
-    },
         {
-      path: "refund-list",
-      lazy: async () => ({
-        Component: (await import("@/app/pages/orders/refunds")).default,
-      }),
-    },
-    {
-  path: "cod-refunds",
-  lazy: async () => ({
-    Component: (await import("@/app/pages/orders/cod-refunds")).default,
-  }),
-},
-{
-  path: "refund-bank-accounts",
-  lazy: async () => ({
-    Component: (await import("@/app/pages/orders/refund-bank-accounts")).default,
-  }),
-},
-  ],
-},
+          path: "orders",
+          children: [
+            {
+              index: true,
+              element: <Navigate to="/orders/all-orders" replace />,
+            },
+            {
+              path: "all-orders",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/all-orders")).default,
+              }),
+            },
+            {
+              path: "all-orders/:orderId",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/all-orders/detail")).default,
+              }),
+            },
+            {
+              path: "order-profit-report",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/order-profit-report")).default,
+              }),
+            },
+            {
+              path: "all-vendor-order-report",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/vendor-order-report")).default,
+              }),
+            },
+            {
+              path: "return-requests",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/return-requests")).default,
+              }),
+            },
+            {
+              path: "refund-list",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/refunds")).default,
+              }),
+            },
+          ],
+        },
+        {
+          path: "cod-refund-management",
+          children: [
+            {
+              index: true,
+              element: <Navigate to="/cod-refund-management/cod-refunds" replace />,
+            },
+            {
+              path: "cod-refunds",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/cod-refunds")).default,
+              }),
+            },
+            {
+              path: "refund-bank-accounts",
+              lazy: async () => ({
+                Component: (await import("@/app/pages/orders/refund-bank-accounts")).default,
+              }),
+            },
+          ],
+        },
         {
           path: "reports",
           children: [

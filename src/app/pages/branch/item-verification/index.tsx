@@ -11,6 +11,8 @@ import {
 } from "@headlessui/react";
 import {
   ArrowPathIcon,
+  ArrowsRightLeftIcon,
+  BuildingStorefrontIcon,
   CheckCircleIcon,
   EllipsisHorizontalIcon,
   EyeIcon,
@@ -40,7 +42,13 @@ import {
 // Local Imports
 import { Page } from "@/components/shared/Page";
 import { Badge, Button, Input } from "@/components/ui";
-import { Get, Patch, toasterrormsg, toastsuccessmsg } from "@/ApiHelper";
+import {
+  Get,
+  Patch,
+  Post,
+  toasterrormsg,
+  toastsuccessmsg,
+} from "@/ApiHelper";
 import { MasterTable } from "@/app/pages/master/shared/MasterTable";
 import { SelectCell, SelectHeader } from "@/components/shared/table/SelectCheckbox";
 import { fuzzyFilter } from "@/utils/react-table/fuzzyFilter";
@@ -48,11 +56,12 @@ import {
   WebsiteItem,
   ItemStatus,
   STATUS_TABS,
+  PLACEHOLDER_IMG,
   mapApiItem,
   statusColor,
 } from "./data";
 import { ItemViewModal } from "./ItemViewModal";
-import { ItemConfirmModal } from "./ItemConfirmModal";
+import { ItemConfirmModal, ItemConfirmAction } from "./ItemConfirmModal";
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
 function ItemRowActions({
@@ -60,12 +69,17 @@ function ItemRowActions({
   onView,
   onApprove,
   onReject,
+  onSync,
 }: {
   item: WebsiteItem;
   onView: (i: WebsiteItem) => void;
   onApprove: (i: WebsiteItem) => void;
   onReject: (i: WebsiteItem) => void;
+  onSync: (i: WebsiteItem) => void;
 }) {
+  const isPending = item.websiteStatus === "pending";
+  const needsSync = item.websiteStatus === "approved" && !item.linkedProduct;
+
   return (
     <Menu as="div" className="relative inline-block text-left">
       <MenuButton as={Button} isIcon className="size-8 rounded-full">
@@ -99,36 +113,59 @@ function ItemRowActions({
               </button>
             )}
           </MenuItem>
-          <MenuItem>
-            {({ focus }: { focus: boolean }) => (
-              <button
-                type="button"
-                onClick={() => onApprove(item)}
-                className={clsx(
-                  "flex h-9 w-full items-center gap-3 px-3 tracking-wide outline-hidden transition-colors",
-                  focus ? "bg-success/10 text-success" : "text-success",
+
+          {isPending && (
+            <>
+              <MenuItem>
+                {({ focus }: { focus: boolean }) => (
+                  <button
+                    type="button"
+                    onClick={() => onApprove(item)}
+                    className={clsx(
+                      "flex h-9 w-full items-center gap-3 px-3 tracking-wide outline-hidden transition-colors",
+                      focus ? "bg-success/10 text-success" : "text-success",
+                    )}
+                  >
+                    <CheckCircleIcon className="size-4.5 stroke-1" />
+                    <span>Approve</span>
+                  </button>
                 )}
-              >
-                <CheckCircleIcon className="size-4.5 stroke-1" />
-                <span>Approve</span>
-              </button>
-            )}
-          </MenuItem>
-          <MenuItem>
-            {({ focus }: { focus: boolean }) => (
-              <button
-                type="button"
-                onClick={() => onReject(item)}
-                className={clsx(
-                  "flex h-9 w-full items-center gap-3 px-3 tracking-wide outline-hidden transition-colors",
-                  focus ? "bg-error/10 text-error" : "text-error",
+              </MenuItem>
+              <MenuItem>
+                {({ focus }: { focus: boolean }) => (
+                  <button
+                    type="button"
+                    onClick={() => onReject(item)}
+                    className={clsx(
+                      "flex h-9 w-full items-center gap-3 px-3 tracking-wide outline-hidden transition-colors",
+                      focus ? "bg-error/10 text-error" : "text-error",
+                    )}
+                  >
+                    <XCircleIcon className="size-4.5 stroke-1" />
+                    <span>Reject</span>
+                  </button>
                 )}
-              >
-                <XCircleIcon className="size-4.5 stroke-1" />
-                <span>Reject</span>
-              </button>
-            )}
-          </MenuItem>
+              </MenuItem>
+            </>
+          )}
+
+          {needsSync && (
+            <MenuItem>
+              {({ focus }: { focus: boolean }) => (
+                <button
+                  type="button"
+                  onClick={() => onSync(item)}
+                  className={clsx(
+                    "flex h-9 w-full items-center gap-3 px-3 tracking-wide outline-hidden transition-colors",
+                    focus ? "bg-primary/10 text-primary" : "text-primary",
+                  )}
+                >
+                  <ArrowsRightLeftIcon className="size-4.5 stroke-1" />
+                  <span>Sync Now</span>
+                </button>
+              )}
+            </MenuItem>
+          )}
         </MenuItems>
       </Transition>
     </Menu>
@@ -144,25 +181,34 @@ export default function ItemVerificationPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
+  // Branch filter (server side, debounced – same as old software)
+  const [branchInput, setBranchInput] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+
   // View modal
   const [viewOpen, setViewOpen] = useState(false);
   const [viewItem, setViewItem] = useState<WebsiteItem | null>(null);
 
   // Confirm modal
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ItemConfirmAction | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<WebsiteItem | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+
+  // ── Debounce branch input ──────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setBranchFilter(branchInput.trim()), 500);
+    return () => clearTimeout(t);
+  }, [branchInput]);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = (await Get(
-        `pos/admin/website-items/`,
-        { status: activeTab },
-        false,
-      )) as any;
+      const params: Record<string, string> = { status: activeTab };
+      if (branchFilter) params.branch = branchFilter;
+
+      const res = (await Get(`pos/admin/website-items/`, params, false)) as any;
       const body = res?.data ?? res;
       const rows: any[] = Array.isArray(body?.items)
         ? body.items
@@ -177,7 +223,7 @@ export default function ItemVerificationPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, branchFilter]);
 
   useEffect(() => {
     fetchItems();
@@ -189,42 +235,73 @@ export default function ItemVerificationPage() {
     setViewOpen(true);
   }, []);
 
-  const onApprove = useCallback((item: WebsiteItem) => {
-    setConfirmTarget(item);
-    setConfirmAction("approve");
-    setConfirmOpen(true);
-  }, []);
+  const openConfirm = useCallback(
+    (item: WebsiteItem, action: ItemConfirmAction) => {
+      setConfirmTarget(item);
+      setConfirmAction(action);
+      setConfirmOpen(true);
+    },
+    [],
+  );
 
-  const onReject = useCallback((item: WebsiteItem) => {
-    setConfirmTarget(item);
-    setConfirmAction("reject");
-    setConfirmOpen(true);
-  }, []);
+  const onApprove = useCallback((item: WebsiteItem) => openConfirm(item, "approve"), [openConfirm]);
+  const onReject = useCallback((item: WebsiteItem) => openConfirm(item, "reject"), [openConfirm]);
+  const onSync = useCallback((item: WebsiteItem) => openConfirm(item, "sync"), [openConfirm]);
 
   const handleConfirm = useCallback(async () => {
     if (!confirmTarget || !confirmAction) return;
     setConfirmLoading(true);
     try {
-      const newStatus = confirmAction === "approve" ? "approved" : "rejected";
-      await Patch(
-        `pos/admin/website-items/${confirmTarget.id}/approve/`,
-        { website_status: newStatus },
-        false,
-      );
-      toastsuccessmsg(`Item ${newStatus} successfully.`);
-      setData((prev) => prev.filter((i) => i.id !== confirmTarget.id));
+      if (confirmAction === "sync") {
+        const res = (await Post(
+          `pos/admin/website-items/${confirmTarget.id}/sync/`,
+          {},
+          false,
+        )) as any;
+        const body = res?.data ?? res;
+        toastsuccessmsg(
+          `${body?.message || "Item synced."}${
+            body?.product_id ? ` Product ID: ${body.product_id}` : ""
+          }`,
+        );
+        await fetchItems();
+      } else {
+        const newStatus = confirmAction === "approve" ? "approved" : "rejected";
+        const res = (await Patch(
+          `pos/admin/website-items/${confirmTarget.id}/approve/`,
+          { website_status: newStatus },
+          false,
+        )) as any;
+        const body = res?.data ?? res;
+
+        if (confirmAction === "approve") {
+          const linkedId = body?.item?.linked_product_id;
+          if (linkedId) {
+            toastsuccessmsg(
+              `Item approved. Product ID: ${linkedId} is now live on the website.`,
+            );
+          } else {
+            toastsuccessmsg("Item approved.");
+            toasterrormsg("Product creation may have issues. Please check.");
+          }
+        } else {
+          toastsuccessmsg("Item rejected successfully.");
+        }
+        setData((prev) => prev.filter((i) => i.id !== confirmTarget.id));
+      }
       setConfirmOpen(false);
       setConfirmTarget(null);
     } catch (e: any) {
       toasterrormsg(
-        e?.response?.data?.detail ||
+        e?.response?.data?.error ||
+          e?.response?.data?.detail ||
           e?.response?.data?.message ||
           "Action failed.",
       );
     } finally {
       setConfirmLoading(false);
     }
-  }, [confirmTarget, confirmAction]);
+  }, [confirmTarget, confirmAction, fetchItems]);
 
   // ── Columns ────────────────────────────────────────────────────────────
   const columns = useMemo<ColumnDef<WebsiteItem>[]>(
@@ -250,11 +327,39 @@ export default function ItemVerificationPage() {
         id: "itemName",
         accessorKey: "itemName",
         header: "Item",
-        cell: ({ getValue }: CellContext<WebsiteItem, unknown>) => (
-          <span className="font-medium text-gray-900 dark:text-white">
-            {String(getValue() || "—")}
-          </span>
-        ),
+        cell: ({ row }: CellContext<WebsiteItem, unknown>) => {
+          const item = row.original;
+          return (
+            <div className="flex items-center gap-3">
+              {item.displayImage ? (
+                <img
+                  src={item.displayImage}
+                  alt={item.itemName}
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = PLACEHOLDER_IMG;
+                  }}
+                  className="size-12 shrink-0 rounded-lg border border-gray-200 object-cover shadow-sm dark:border-dark-500"
+                />
+              ) : (
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-gray-100 dark:bg-dark-600">
+                  <span className="text-xs text-gray-400">No img</span>
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {item.itemName || "—"}
+                </div>
+                {item.shortDescription && (
+                  <div className="line-clamp-1 text-xs text-gray-500 dark:text-dark-300">
+                    {item.shortDescription.substring(0, 50)}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        },
       },
       {
         id: "branchName",
@@ -281,7 +386,7 @@ export default function ItemVerificationPage() {
         header: "Variants",
         cell: ({ row }: CellContext<WebsiteItem, unknown>) => (
           <span className="font-medium text-gray-700 dark:text-dark-200">
-            {row.original.variants.length}
+            {row.original.variantsCount} variants
           </span>
         ),
         enableGlobalFilter: false,
@@ -303,7 +408,11 @@ export default function ItemVerificationPage() {
         header: "Final Price",
         cell: ({ row }: CellContext<WebsiteItem, unknown>) => (
           <span className="font-semibold text-gray-800 dark:text-dark-100">
-            ₹{row.original.finalPrice.toLocaleString("en-IN")}
+            ₹
+            {row.original.finalPrice.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
         ),
         enableGlobalFilter: false,
@@ -311,12 +420,23 @@ export default function ItemVerificationPage() {
       {
         id: "websiteStatus",
         header: "Status",
-        cell: ({ row }: CellContext<WebsiteItem, unknown>) => (
-          <Badge color={statusColor(row.original.websiteStatus) as any} variant="soft">
-            {row.original.websiteStatus.charAt(0).toUpperCase() +
-              row.original.websiteStatus.slice(1)}
-          </Badge>
-        ),
+        cell: ({ row }: CellContext<WebsiteItem, unknown>) => {
+          const item = row.original;
+          return (
+            <div className="flex flex-col items-start gap-1">
+              <Badge color={statusColor(item.websiteStatus) as any} variant="soft">
+                {item.websiteStatus.charAt(0).toUpperCase() +
+                  item.websiteStatus.slice(1)}
+              </Badge>
+              {item.websiteStatus === "approved" && item.linkedProduct && (
+                <span className="flex items-center gap-1 text-xs font-medium text-success">
+                  <CheckCircleIcon className="size-3.5" />
+                  Live (ID: {item.linkedProduct})
+                </span>
+              )}
+            </div>
+          );
+        },
         enableGlobalFilter: false,
       },
       {
@@ -332,12 +452,13 @@ export default function ItemVerificationPage() {
               onView={onView}
               onApprove={onApprove}
               onReject={onReject}
+              onSync={onSync}
             />
           </div>
         ),
       },
     ],
-    [onView, onApprove, onReject],
+    [onView, onApprove, onReject, onSync],
   );
 
   const table = useReactTable({
@@ -414,7 +535,18 @@ export default function ItemVerificationPage() {
                 </div>
 
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
-                  {/* Search input — full width on mobile, fixed on sm+ */}
+                  {/* Branch filter (server side) */}
+                  <div className="w-full sm:w-64">
+                    <Input
+                      label="Branch"
+                      value={branchInput}
+                      onChange={(e) => setBranchInput(e.target.value)}
+                      prefix={<BuildingStorefrontIcon className="size-4" />}
+                      placeholder="Filter by branch name..."
+                    />
+                  </div>
+
+                  {/* Search input (client side) */}
                   <div className="w-full sm:w-72">
                     <Input
                       label="Search"
@@ -425,7 +557,7 @@ export default function ItemVerificationPage() {
                     />
                   </div>
 
-                  {/* Refresh button — full width on mobile */}
+                  {/* Refresh button */}
                   <Button
                     color="primary"
                     variant="outlined"

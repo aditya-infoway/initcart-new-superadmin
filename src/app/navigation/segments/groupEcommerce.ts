@@ -80,15 +80,14 @@ export const groupEcommerce: NavigationTree = {
 {
   id: "CODRefunds",
   type: "collapse",
-  path: "/orders",
+  path: "/cod-refund-management",
   title: "COD Refund Management",
   icon: "CODRefunds",
   childs: [
-    { id: "CODRefunds.refundList",   type: "item", path: "/orders/cod-refunds",          title: "COD Refunds",          icon: "CODRefunds" },
-    { id: "CODRefunds.bankAccounts", type: "item", path: "/orders/refund-bank-accounts", title: "Refund Bank Accounts", icon: "CODRefunds" },
+    { id: "CODRefunds.refundList",   type: "item", path: "/cod-refund-management/cod-refunds",          title: "COD Refunds",          icon: "CODRefunds" },
+    { id: "CODRefunds.bankAccounts", type: "item", path: "/cod-refund-management/refund-bank-accounts", title: "Refund Bank Accounts", icon: "CODRefunds" },
   ],
 },
-
     // ── Reports ───────────────────────────────────────────────────────
     {
       id: "reports",
