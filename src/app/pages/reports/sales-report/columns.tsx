@@ -1,3 +1,4 @@
+//reports/sales-report/columns.tsx
 import { ColumnDef } from "@tanstack/react-table";
 
 import { SalesReportVendorRow } from "./data";

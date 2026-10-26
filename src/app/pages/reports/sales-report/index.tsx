@@ -1,3 +1,4 @@
+//reports/sales-report/index.tsx
 import {
   getCoreRowModel,
   getPaginationRowModel,

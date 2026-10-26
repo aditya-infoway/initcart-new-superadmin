@@ -1,3 +1,5 @@
+
+//reports/sales-report/data.ts
 export interface SalesReportVendorRow {
   id: string;
   vendorId: string;

@@ -1,3 +1,6 @@
+
+
+//MasterTable.tsx
 import {
   flexRender,
   Table as TanstackTable,

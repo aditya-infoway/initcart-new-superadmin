@@ -11,7 +11,12 @@ import { Fragment } from "react";
 // Local Imports
 import { Badge, Button } from "@/components/ui";
 import { formatDateDDMMYYYY } from "@/ApiHelper";
-import { WebsiteItem, ItemVariant, statusColor } from "./data";
+import {
+  WebsiteItem,
+  ItemVariant,
+  statusColor,
+  PLACEHOLDER_IMG,
+} from "./data";
 
 // ----------------------------------------------------------------------
 
@@ -26,6 +31,12 @@ function money(n: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  img.onerror = null;
+  img.src = PLACEHOLDER_IMG;
 }
 
 function InfoRow({
@@ -80,6 +91,8 @@ function VariantRow({ v, i }: { v: ItemVariant; i: number }) {
           <img
             src={v.image}
             alt="variant"
+            loading="lazy"
+            onError={handleImgError}
             className="size-8 rounded border border-gray-200 object-cover dark:border-dark-500"
           />
         ) : (
@@ -105,7 +118,30 @@ function VariantRow({ v, i }: { v: ItemVariant; i: number }) {
   );
 }
 
+function ImageBox({ label, src }: { label: string; src: string }) {
+  return (
+    <div className="text-center">
+      <p className="mb-1 text-xs font-semibold text-gray-500 dark:text-dark-300">
+        {label}
+      </p>
+      <img
+        src={src}
+        alt={label}
+        loading="lazy"
+        onError={handleImgError}
+        className="mx-auto h-16 w-auto max-w-[6rem] rounded border border-gray-200 object-contain dark:border-dark-500"
+      />
+    </div>
+  );
+}
+
 export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
+  const returnText = item?.returnPolicy
+    ? `${item.returnPolicy}${item.returnDays ? ` (${item.returnDays} days)` : ""}`
+    : item?.returnDays
+      ? `${item.returnDays} days`
+      : "";
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-120" onClose={close}>
@@ -130,7 +166,7 @@ export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
               leave="ease-in duration-150"
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-2"
-              className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-dark-700"
+              className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-dark-700"
             >
               {/* Close btn */}
               <div className="flex justify-end px-3 pt-3 sm:px-4 sm:pt-4">
@@ -172,7 +208,7 @@ export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
                   right={
                     <FieldLabel
                       label="Created"
-                      value={item ? formatDateDDMMYYYY(item.createdAt) : ""}
+                      value={item?.createdAt ? formatDateDDMMYYYY(item.createdAt) : ""}
                     />
                   }
                 />
@@ -181,17 +217,25 @@ export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
                   right={<FieldLabel label="Sub Category" value={item?.subCategory} />}
                 />
 
-                {/* Short description */}
-                <div className="rounded-lg bg-gray-50 px-4 py-2.5 text-center text-sm text-gray-600 dark:bg-dark-800 dark:text-dark-200">
-                  <span className="font-semibold">Short: </span>
-                  {item?.shortDescription || "N/A"}
+                {/* Descriptions */}
+                <div className="space-y-1 rounded-lg bg-gray-50 px-4 py-2.5 text-sm text-gray-600 dark:bg-dark-800 dark:text-dark-200">
+                  <div>
+                    <span className="font-semibold">Short: </span>
+                    {item?.shortDescription || "N/A"}
+                  </div>
+                  {item?.fullDescription && (
+                    <div>
+                      <span className="font-semibold">Full: </span>
+                      {item.fullDescription}
+                    </div>
+                  )}
                 </div>
 
                 {/* Features & Specs */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <BoxSection title="Features">
                     {item?.features?.length ? (
-                      <ul className="space-y-1 text-sm text-gray-700 dark:text-dark-200">
+                      <ul className="max-h-32 space-y-1 overflow-y-auto text-sm text-gray-700 dark:text-dark-200">
                         {item.features.map((f, i) => (
                           <li key={i}>• {f}</li>
                         ))}
@@ -204,9 +248,12 @@ export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
                   </BoxSection>
                   <BoxSection title="Specifications">
                     {item?.specifications?.length ? (
-                      <ul className="space-y-1 text-sm text-gray-700 dark:text-dark-200">
+                      <ul className="max-h-32 space-y-1 overflow-y-auto text-sm text-gray-700 dark:text-dark-200">
                         {item.specifications.map((s, i) => (
-                          <li key={i}>• {s}</li>
+                          <li key={i}>
+                            <span className="font-medium">{s.title || "Spec"}:</span>{" "}
+                            {s.value}
+                          </li>
                         ))}
                       </ul>
                     ) : (
@@ -217,26 +264,42 @@ export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
                   </BoxSection>
                 </div>
 
-                {/* Policy info */}
+                {/* Warranty & shipping */}
                 <div className="rounded-lg bg-gray-50 px-4 py-3 text-sm dark:bg-dark-800">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-                    <FieldLabel label="Warranty" value={item?.warranty} />
+                    <FieldLabel
+                      label="Warranty"
+                      value={item?.warrantyAvailable ? "Yes" : "No"}
+                    />
+                    {item?.warrantyAvailable && (
+                      <>
+                        <FieldLabel label="Type" value={item.warrantyType} />
+                        <FieldLabel label="Period" value={item.warrantyPeriod} />
+                      </>
+                    )}
+                    <FieldLabel label="Return" value={returnText} />
                     <FieldLabel label="Delivery" value={item?.deliveryInfo} />
-                    <FieldLabel label="Return" value={item?.returnPolicy} />
                     <FieldLabel
                       label="Free Shipping"
                       value={item?.freeShipping ? "Yes" : "No"}
                     />
-                    <FieldLabel label="Condition" value={item?.condition} />
+                    <FieldLabel label="Condition" value={item?.condition || "New"} />
                   </div>
                 </div>
 
+                {item?.warrantyAvailable && item.warrantyDescription && (
+                  <div className="rounded-lg bg-gray-50 px-4 py-2.5 text-sm text-gray-600 dark:bg-dark-800 dark:text-dark-200">
+                    <span className="font-semibold">Warranty Description: </span>
+                    {item.warrantyDescription}
+                  </div>
+                )}
+
                 {/* Variants table */}
-                {item && item.variants.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-center text-sm font-semibold text-gray-700 dark:text-dark-100">
-                      Variants ({item.variants.length})
-                    </p>
+                <div>
+                  <p className="mb-2 text-center text-sm font-semibold text-gray-700 dark:text-dark-100">
+                    Variants ({item?.variants.length ?? 0})
+                  </p>
+                  {item && item.variants.length > 0 ? (
                     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-dark-500">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-gray-100 dark:bg-dark-700">
@@ -260,6 +323,20 @@ export function ItemViewModal({ isOpen, close, item }: ItemViewModalProps) {
                         </tbody>
                       </table>
                     </div>
+                  ) : (
+                    <p className="text-center text-sm text-gray-400 dark:text-dark-400">
+                      No variants
+                    </p>
+                  )}
+                </div>
+
+                {/* Main / Thumb images */}
+                {(item?.mainImage || item?.thumbnailImage) && (
+                  <div className="flex justify-center gap-6 border-t border-gray-100 pt-4 dark:border-dark-600">
+                    {item.mainImage && <ImageBox label="Main" src={item.mainImage} />}
+                    {item.thumbnailImage && (
+                      <ImageBox label="Thumb" src={item.thumbnailImage} />
+                    )}
                   </div>
                 )}
               </div>

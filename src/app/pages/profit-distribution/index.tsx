@@ -541,13 +541,13 @@ export default function ProfitDistributionPage() {
             </div>
           </div>
 
-          {/* Referral note */}
+          {/* Referral note
           {posSettings?.description?.referral && (
             <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
               <span className="font-semibold">Referral: </span>
               {posSettings.description?.referral}
             </div>
-          )}
+          )} */}
         </Card>
 
         {/* ── Profit Distribution Management ── */}

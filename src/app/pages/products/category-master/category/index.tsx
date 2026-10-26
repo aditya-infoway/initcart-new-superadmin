@@ -27,6 +27,18 @@ import {
   emptyCategory,
   mapApiCategoryToCategory,
 } from "./data";
+import { HomepageSectionCard } from "./homepageSectionCard";
+
+// message / detail / first field error from the API
+const apiError = (error: any, fallback: string) => {
+  const d = error?.response?.data;
+  if (!d) return fallback;
+  if (typeof d === "string") return d;
+  if (d.message) return String(d.message);
+  if (d.detail) return String(d.detail);
+  const first: any = Object.values(d)[0];
+  return Array.isArray(first) ? String(first[0]) : first ? String(first) : fallback;
+};
 
 export default function ProductCategoryPage() {
   const [data, setData] = useState<Category[]>([]);
@@ -83,9 +95,8 @@ export default function ProductCategoryPage() {
       }
       await fetchAll();
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.detail || "Something went wrong while saving the category.";
-      toasterrormsg(message);
-      throw error;
+      toasterrormsg(apiError(error, "Something went wrong while saving the category."));
+      throw error; // drawer stays open and shows field errors
     }
   };
 
@@ -95,8 +106,7 @@ export default function ProductCategoryPage() {
       toastsuccessmsg("Category deleted successfully.");
       setData((prev) => prev.filter((item) => item.id !== category.id));
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.detail || "Something went wrong while deleting the category.";
-      toasterrormsg(message);
+      toasterrormsg(apiError(error, "Something went wrong while deleting the category."));
     }
   };
 
@@ -112,35 +122,43 @@ export default function ProductCategoryPage() {
     }
   };
 
-  const handleToggleFeatured = async (category: Category) => {
+  // Confirm popup is shown in the column cell, success feedback comes from that modal.
+  const handleToggleFeatured = async (category: Category): Promise<boolean> => {
     try {
       await Patch(`ecommerce/category/${category.id}/feature/`, {}, false);
-      toastsuccessmsg(category.featured ? "Category unfeatured successfully." : "Category marked as featured.");
-      await fetchAll();
+      setData((prev) =>
+        prev.map((item) =>
+          item.id === category.id ? { ...item, featured: !item.featured } : item,
+        ),
+      );
+      return true;
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.detail || "Something went wrong while updating featured category.";
-      toasterrormsg(message);
+      toasterrormsg(apiError(error, "Failed to update featured status."));
+      return false;
     }
   };
 
-  const handleToggleWebHome = async (category: Category) => {
+  const handleToggleWebHome = async (category: Category): Promise<boolean> => {
     try {
       const formData = new FormData();
       formData.append("web_home", category.showOnHomepage ? "false" : "true");
       await Put(`ecommerce/category/${category.id}/`, formData, true);
-      toastsuccessmsg(category.showOnHomepage ? "Hidden from homepage." : "Now showing on homepage.");
       setData((prev) =>
         prev.map((item) =>
           item.id === category.id ? { ...item, showOnHomepage: !item.showOnHomepage } : item,
         ),
       );
+      return true;
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.response?.data?.detail || "Something went wrong while updating homepage visibility.";
-      toasterrormsg(message);
+      toasterrormsg(apiError(error, "Failed to update homepage status."));
+      return false;
     }
   };
 
-  const columns = getColumns({ onToggleFeatured: handleToggleFeatured, onToggleWebHome: handleToggleWebHome });
+  const columns = getColumns({
+    onToggleFeatured: handleToggleFeatured,
+    onToggleWebHome: handleToggleWebHome,
+  });
 
   const table = useReactTable({
     data: filteredData,
@@ -170,6 +188,8 @@ export default function ProductCategoryPage() {
   return (
     <Page title="Category">
       <div className="transition-content w-full pb-5">
+        <HomepageSectionCard />
+
         <MasterToolbar
           title="Category"
           createLabel="Add Category"

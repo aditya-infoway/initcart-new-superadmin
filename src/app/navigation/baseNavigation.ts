@@ -1,4 +1,4 @@
-import { NavigationTree } from "@/@types/navigation";
+ import { NavigationTree } from "@/@types/navigation";
 
 /**
  * Object containing the base navigation items for the application.

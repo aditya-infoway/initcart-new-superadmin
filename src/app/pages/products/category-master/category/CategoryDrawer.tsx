@@ -6,12 +6,13 @@ import {
 } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/solid";
 import { Controller, useForm } from "react-hook-form";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { Listbox } from "@/components/shared/form/StyledListbox";
 import { Button, Input, Radio, Textarea } from "@/components/ui";
 import { statusOptions } from "../../../master/shared/constants";
 import { Category, CategoryFormValues } from "./data";
+import { compressBanner, compressImage, isValidFileType } from "./imageUtils";
 
 interface CategoryDrawerProps {
   isOpen: boolean;
@@ -20,21 +21,27 @@ interface CategoryDrawerProps {
   onSave: (values: CategoryFormValues, categoryId?: string) => Promise<void> | void;
 }
 
-function FileInput({
-  existingName,
+function ImageField({
+  label,
+  hint,
+  preview,
+  previewClassName,
   error,
-  onChange,
+  onPick,
 }: {
-  existingName?: string;
+  label: string;
+  hint: string;
+  preview?: string;
+  previewClassName: string;
   error?: string;
-  onChange: (files: FileList | undefined) => void;
+  onPick: (file: File | undefined) => void;
 }) {
   const [selectedName, setSelectedName] = useState("");
 
   return (
     <div>
       <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-dark-100">
-        Icon
+        {label}
       </label>
       <input
         type="file"
@@ -42,18 +49,26 @@ function FileInput({
         onChange={(e) => {
           const file = e.target.files?.[0];
           setSelectedName(file?.name || "");
-          onChange(e.target.files || undefined);
+          onPick(file);
+          e.target.value = ""; // allow picking the same file again
         }}
         className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-primary-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-450 dark:bg-dark-700 dark:text-white dark:file:bg-primary/15 dark:file:text-primary-300"
       />
-      <p className="mt-2 text-xs text-gray-400 dark:text-dark-300">
-        Accepted: JPG, JPEG, PNG. Auto resized to 200 x 200 px.
-      </p>
-      {selectedName || existingName ? (
-        <p className="mt-2 break-all text-xs text-gray-500 dark:text-dark-300">
-          {selectedName || existingName}
-        </p>
-      ) : null}
+
+      <div className="mt-2 flex items-center gap-3">
+        {preview ? (
+          <img src={preview} alt={`${label} preview`} className={previewClassName} />
+        ) : null}
+        <div className="text-xs text-gray-400 dark:text-dark-300">
+          {hint}
+          {selectedName ? (
+            <span className="mt-1 block break-all text-gray-500 dark:text-dark-300">
+              {selectedName}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
       {error ? <p className="mt-1 text-sm text-error">{error}</p> : null}
     </div>
   );
@@ -62,6 +77,9 @@ function FileInput({
 export function CategoryDrawer({ isOpen, close, category, onSave }: CategoryDrawerProps) {
   const isEdit = Boolean(category?.id);
   const [saving, setSaving] = useState(false);
+  const [iconPreview, setIconPreview] = useState("");
+  const [bannerPreview, setBannerPreview] = useState("");
+  const blobUrls = useRef<string[]>([]);
 
   const defaultValues = useMemo<CategoryFormValues>(
     () => ({
@@ -70,7 +88,8 @@ export function CategoryDrawer({ isOpen, close, category, onSave }: CategoryDraw
       platformCharge: category?.platformCharge || "0",
       status: category?.status || "active",
       showOnHomepage: category?.showOnHomepage ? "yes" : "no",
-      icon: undefined,
+      icon: null,
+      banner: null,
     }),
     [category],
   );
@@ -81,18 +100,74 @@ export function CategoryDrawer({ isOpen, close, category, onSave }: CategoryDraw
     control,
     reset,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
-  } = useForm<CategoryFormValues>({
-    defaultValues,
-  });
+  } = useForm<CategoryFormValues>({ defaultValues });
+
+  const revokeBlobs = () => {
+    blobUrls.current.forEach((u) => URL.revokeObjectURL(u));
+    blobUrls.current = [];
+  };
+
+  const makePreview = (file: File) => {
+    const url = URL.createObjectURL(file);
+    blobUrls.current.push(url);
+    return url;
+  };
 
   useEffect(() => {
-    if (isOpen) reset(defaultValues);
+    if (isOpen) {
+      revokeBlobs();
+      reset(defaultValues);
+      setIconPreview(category?.icon || "");
+      setBannerPreview(category?.banner || "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultValues, isOpen, reset]);
 
+  useEffect(() => revokeBlobs, []);
+
   const handleClose = () => {
+    revokeBlobs();
     reset(defaultValues);
     close();
+  };
+
+  const handleIconPick = async (file?: File) => {
+    clearErrors("icon");
+    if (!file) return;
+    if (!isValidFileType(file)) {
+      setValue("icon", null);
+      setError("icon", { message: "Invalid file type. Only JPG, JPEG and PNG allowed." });
+      return;
+    }
+    try {
+      const processed = await compressImage(file, 200, 100);
+      setValue("icon", processed);
+      setIconPreview(makePreview(processed));
+    } catch {
+      setValue("icon", null);
+      setError("icon", { message: "Unable to process selected image." });
+    }
+  };
+
+  const handleBannerPick = async (file?: File) => {
+    clearErrors("banner");
+    if (!file) return;
+    if (!isValidFileType(file)) {
+      setValue("banner", null);
+      setError("banner", { message: "Invalid banner file type. Only JPG, JPEG and PNG allowed." });
+      return;
+    }
+    try {
+      const processed = await compressBanner(file);
+      setValue("banner", processed);
+      setBannerPreview(makePreview(processed));
+    } catch {
+      setValue("banner", null);
+      setError("banner", { message: "Unable to process selected banner image." });
+    }
   };
 
   const onSubmit = async (values: CategoryFormValues) => {
@@ -100,6 +175,11 @@ export function CategoryDrawer({ isOpen, close, category, onSave }: CategoryDraw
     try {
       await onSave(values, category?.id);
       handleClose();
+    } catch (error: any) {
+      // keep the drawer open and show server field errors
+      const data = error?.response?.data;
+      if (data?.icon) setError("icon", { message: String(data.icon) });
+      if (data?.banner_image) setError("banner", { message: String(data.banner_image) });
     } finally {
       setSaving(false);
     }
@@ -146,16 +226,41 @@ export function CategoryDrawer({ isOpen, close, category, onSave }: CategoryDraw
 
               <Input
                 label="Platform Charge (%)"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
                 placeholder="0"
                 description="This percentage will be charged on each sale in this category"
-                {...register("platformCharge", { required: "Platform Charge is required" })}
+                {...register("platformCharge", {
+                  required: "Platform charge is required",
+                  validate: (v) => {
+                    const n = Number(v);
+                    if (v === "" || Number.isNaN(n)) return "Enter a valid number";
+                    if (n < 0) return "Platform charge cannot be negative";
+                    if (n > 100) return "Platform charge cannot exceed 100%";
+                    return true;
+                  },
+                })}
                 error={errors.platformCharge?.message}
               />
 
-              <FileInput
-                existingName={category?.icon}
-                error={typeof errors.icon?.message === "string" ? errors.icon.message : undefined}
-                onChange={(files) => setValue("icon", files)}
+              <ImageField
+                label="Icon"
+                hint="Accepted: JPG, JPEG, PNG. Auto resized to 200 x 200 px."
+                preview={iconPreview}
+                previewClassName="size-20 shrink-0 rounded border border-gray-200 object-cover dark:border-dark-500"
+                error={errors.icon?.message as string | undefined}
+                onPick={handleIconPick}
+              />
+
+              <ImageField
+                label="Homepage Banner (800 × 500)"
+                hint="Accepted: JPG, JPEG, PNG. Auto cropped and resized to 800 x 500 px."
+                preview={bannerPreview}
+                previewClassName="w-40 shrink-0 rounded border border-gray-200 object-cover aspect-[8/5] dark:border-dark-500"
+                error={errors.banner?.message as string | undefined}
+                onPick={handleBannerPick}
               />
 
               <Controller
@@ -190,7 +295,7 @@ export function CategoryDrawer({ isOpen, close, category, onSave }: CategoryDraw
             <div className="flex justify-end gap-3 border-t border-gray-200 px-4 py-4 dark:border-dark-500 sm:px-5">
               <Button type="button" onClick={handleClose} disabled={saving}>Cancel</Button>
               <Button type="submit" color="primary" disabled={saving} className="min-w-[7rem]">
-                {saving ? "Saving..." : isEdit ? "Update" : "Add"}
+                {saving ? (isEdit ? "Updating..." : "Adding...") : isEdit ? "Update" : "Add"}
               </Button>
             </div>
           </form>

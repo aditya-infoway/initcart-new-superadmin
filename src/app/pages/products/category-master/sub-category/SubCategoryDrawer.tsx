@@ -6,10 +6,16 @@ import {
 } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/solid";
 import { Controller, useForm } from "react-hook-form";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { Listbox } from "@/components/shared/form/StyledListbox";
 import { Button, Input, Switch } from "@/components/ui";
+import { ImageField } from "../../../master/shared/IimageField";
+import {
+  compressBanner,
+  compressImage,
+  isValidFileType,
+} from "../../../master/shared/imageUtils";
 import { ParentCategoryOption, SubCategory, SubCategoryFormValues } from "./data";
 
 interface SubCategoryDrawerProps {
@@ -18,45 +24,6 @@ interface SubCategoryDrawerProps {
   subCategory: SubCategory | null;
   categoryOptions: ParentCategoryOption[];
   onSave: (values: SubCategoryFormValues, subCategoryId?: string) => Promise<void> | void;
-}
-
-function FileInput({
-  existingName,
-  error,
-  onChange,
-}: {
-  existingName?: string;
-  error?: string;
-  onChange: (files: FileList | undefined) => void;
-}) {
-  const [selectedName, setSelectedName] = useState("");
-
-  return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-dark-100">
-        Icon
-      </label>
-      <input
-        type="file"
-        accept="image/jpeg,image/jpg,image/png"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          setSelectedName(file?.name || "");
-          onChange(e.target.files || undefined);
-        }}
-        className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-primary-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-450 dark:bg-dark-700 dark:text-white dark:file:bg-primary/15 dark:file:text-primary-300"
-      />
-      <p className="mt-2 text-xs text-gray-400 dark:text-dark-300">
-        Accepted: JPG, JPEG, PNG. Auto resized to 200 × 200 px.
-      </p>
-      {selectedName || existingName ? (
-        <p className="mt-2 break-all text-xs text-gray-500 dark:text-dark-300">
-          {selectedName || existingName}
-        </p>
-      ) : null}
-      {error ? <p className="mt-1 text-sm text-error">{error}</p> : null}
-    </div>
-  );
 }
 
 export function SubCategoryDrawer({
@@ -68,13 +35,18 @@ export function SubCategoryDrawer({
 }: SubCategoryDrawerProps) {
   const isEdit = Boolean(subCategory?.id);
   const [saving, setSaving] = useState(false);
+  const [iconPreview, setIconPreview] = useState("");
+  const [bannerPreview, setBannerPreview] = useState("");
+  const blobUrls = useRef<string[]>([]);
 
   const defaultValues = useMemo<SubCategoryFormValues>(
     () => ({
       categoryId: subCategory?.parentCategoryId || "",
       name: subCategory?.name || "",
+      description: subCategory?.description || "",
       status: subCategory?.isActive ?? true,
-      icon: undefined,
+      icon: null,
+      banner: null,
     }),
     [subCategory],
   );
@@ -85,18 +57,77 @@ export function SubCategoryDrawer({
     control,
     reset,
     setValue,
+    setError,
+    clearErrors,
+    watch,
     formState: { errors },
-  } = useForm<SubCategoryFormValues>({
-    defaultValues,
-  });
+  } = useForm<SubCategoryFormValues>({ defaultValues });
+
+  const descriptionLength = (watch("description") || "").length;
+
+  const revokeBlobs = () => {
+    blobUrls.current.forEach((u) => URL.revokeObjectURL(u));
+    blobUrls.current = [];
+  };
+
+  const makePreview = (file: File) => {
+    const url = URL.createObjectURL(file);
+    blobUrls.current.push(url);
+    return url;
+  };
 
   useEffect(() => {
-    if (isOpen) reset(defaultValues);
+    if (isOpen) {
+      revokeBlobs();
+      reset(defaultValues);
+      setIconPreview(subCategory?.icon || "");
+      setBannerPreview(subCategory?.banner || "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultValues, isOpen, reset]);
 
+  useEffect(() => revokeBlobs, []);
+
   const handleClose = () => {
+    revokeBlobs();
     reset(defaultValues);
     close();
+  };
+
+  const handleIconPick = async (file?: File) => {
+    clearErrors("icon");
+    if (!file) return;
+    if (!isValidFileType(file)) {
+      setValue("icon", null);
+      setError("icon", { message: "Invalid file type. Only JPG, JPEG and PNG allowed." });
+      return;
+    }
+    try {
+      const processed = await compressImage(file, 200, 100);
+      setValue("icon", processed);
+      setIconPreview(makePreview(processed));
+    } catch {
+      setValue("icon", null);
+      setError("icon", { message: "Unable to process selected image." });
+    }
+  };
+
+  const handleBannerPick = async (file?: File) => {
+    clearErrors("banner");
+    if (!file) return;
+    if (!isValidFileType(file)) {
+      setValue("banner", null);
+      setError("banner", { message: "Invalid banner file type. Only JPG, JPEG and PNG allowed." });
+      return;
+    }
+    try {
+      const processed = await compressBanner(file, 600, 1000, 300);
+      setValue("banner", processed);
+      setBannerPreview(makePreview(processed));
+    } catch {
+      setValue("banner", null);
+      setError("banner", { message: "Unable to process selected banner image." });
+    }
   };
 
   const onSubmit = async (values: SubCategoryFormValues) => {
@@ -104,6 +135,11 @@ export function SubCategoryDrawer({
     try {
       await onSave(values, subCategory?.id);
       handleClose();
+    } catch (error: any) {
+      // keep the drawer open and show server field errors
+      const data = error?.response?.data;
+      if (data?.icon) setError("icon", { message: String(data.icon) });
+      if (data?.banner_image) setError("banner", { message: String(data.banner_image) });
     } finally {
       setSaving(false);
     }
@@ -158,10 +194,33 @@ export function SubCategoryDrawer({
                 error={errors.name?.message}
               />
 
-              <FileInput
-                existingName={subCategory?.icon}
-                error={typeof errors.icon?.message === "string" ? errors.icon.message : undefined}
-                onChange={(files) => setValue("icon", files)}
+              <Input
+                label="Short Description"
+                placeholder="e.g. Premium quality fuel for every day."
+                maxLength={150}
+                description={`Shown below the title on the website card (${descriptionLength}/150)`}
+                {...register("description", {
+                  maxLength: { value: 150, message: "Maximum 150 characters" },
+                })}
+                error={errors.description?.message}
+              />
+
+              <ImageField
+                label="Icon"
+                hint="Accepted: JPG, JPEG, PNG. Auto resized to 200 × 200 px."
+                preview={iconPreview}
+                previewClassName="size-20 shrink-0 rounded border border-gray-200 object-cover dark:border-dark-500"
+                error={errors.icon?.message as string | undefined}
+                onPick={handleIconPick}
+              />
+
+              <ImageField
+                label="Homepage Banner (600 × 1000)"
+                hint="Portrait (3:5), JPG/PNG. Keep the top part empty, the text will appear there. Auto cropped and resized."
+                preview={bannerPreview}
+                previewClassName="w-28 shrink-0 rounded border border-gray-200 object-cover aspect-[3/5] dark:border-dark-500"
+                error={errors.banner?.message as string | undefined}
+                onPick={handleBannerPick}
               />
 
               <Controller
@@ -187,7 +246,7 @@ export function SubCategoryDrawer({
             <div className="flex justify-end gap-3 border-t border-gray-200 px-4 py-4 dark:border-dark-500 sm:px-5">
               <Button type="button" onClick={handleClose} disabled={saving}>Cancel</Button>
               <Button type="submit" color="primary" disabled={saving} className="min-w-[7rem]">
-                {saving ? "Saving..." : isEdit ? "Update" : "Add"}
+                {saving ? (isEdit ? "Updating..." : "Adding...") : isEdit ? "Update" : "Add"}
               </Button>
             </div>
           </form>
